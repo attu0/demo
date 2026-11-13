@@ -275,6 +275,10 @@
           <i class="fa-solid fa-gauge-high"></i>
           <span id="cpuTxt">3%</span>
         </div>
+        <button class="sb-metric sb-res-btn" id="resBtn" title="Open System Resources Logger">
+          <i class="fa-solid fa-chart-line"></i>
+          <span>Resources</span>
+        </button>
       </div>
 
       <!-- Right: Emergency Stop Button + UNO Q Wi-Fi Status -->
@@ -293,6 +297,39 @@
     <button class="toast-close-btn" id="toastCloseBtn" title="Dismiss Alert">×</button>
   </div>
 
+
+  <!-- SYSTEM RESOURCES LOGGER -->
+  <div class="res-modal" id="resModal" aria-hidden="true">
+    <div class="res-card" role="dialog" aria-label="System resources logger">
+      <div class="res-head">
+        <span class="res-title"><i class="fa-solid fa-chart-line"></i> System Resources</span>
+        <span class="res-live-dot" id="resLiveDot" title="Flashes when live data arrives"></span>
+        <div class="res-tabs" id="resTabs">
+          <button class="res-tab active" data-rtab="live">Live</button>
+          <button class="res-tab" data-rtab="1h">1 h</button>
+          <button class="res-tab" data-rtab="1d">1 D</button>
+        </div>
+        <button class="res-close" id="resClose" title="Close">×</button>
+      </div>
+      <div class="res-body">
+        <div class="res-chart-box">
+          <div class="res-chart-title">CPU Usage (%)</div>
+          <div class="res-canvas-wrap">
+            <canvas id="resCpuCanvas"></canvas>
+            <div class="res-nodata" id="resCpuNo">No data</div>
+          </div>
+        </div>
+        <div class="res-chart-box">
+          <div class="res-chart-title">Memory Usage (%)</div>
+          <div class="res-canvas-wrap">
+            <canvas id="resMemCanvas"></canvas>
+            <div class="res-nodata" id="resMemNo">No data</div>
+          </div>
+        </div>
+      </div>
+      <div class="res-hint" id="resHint">Live: sampled every 5 s from the UNO Q.</div>
+    </div>
+  </div>
 
   <script src="libs/socket.io.min.js"></script>
   <script src="app.js"></script>

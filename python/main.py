@@ -1,9 +1,13 @@
 import time
 import threading
 import random
+import datetime
+
+import psutil
 
 from arduino.app_utils import App
 from arduino.app_bricks.web_ui import WebUI
+from arduino.app_bricks.dbstorage_tsstore import TimeSeriesStore
 
 # Bridge talks to the sketch on the MCU. If it is missing or the sketch does not
 # provide these functions yet, calls are logged and skipped instead of crashing.
@@ -13,6 +17,7 @@ except Exception:
     Bridge = None
 
 web_ui = WebUI()
+db = TimeSeriesStore()
 
 WATCHDOG_S = 0.5          # stop rover if no "drive" for this long
 SPRAY_MAX_LINEAR = 0.05   # only spray while (almost) stationary
@@ -182,41 +187,49 @@ for name, fn in [("drive", on_drive), ("estop", on_estop), ("arm", on_arm),
     web_ui.on_message(name, fn)
 
 
-# ---------------- System stats (Linux side of the UNO Q) ----------------
-_last_cpu = None
-
-
-def cpu_percent():
-    global _last_cpu
-    try:
-        with open("/proc/stat") as f:
-            vals = [int(x) for x in f.readline().split()[1:]]
-        idle, total = vals[3] + vals[4], sum(vals)
-        prev, _last_cpu = _last_cpu, (idle, total)
-        if prev is None or total == prev[1]:
-            return 0.0
-        return 100.0 * (1 - (idle - prev[0]) / (total - prev[1]))
-    except Exception:
-        return None
-
-
-def ram_text():
-    try:
-        info = {}
-        with open("/proc/meminfo") as f:
-            for line in f:
-                k, v = line.split(":")
-                info[k] = int(v.split()[0])       # kB
-        used = (info["MemTotal"] - info["MemAvailable"]) / 1048576
-        return f"{used:.2f}/{info['MemTotal'] / 1048576:.2f} GB"
-    except Exception:
-        return None
-
-
+# ---------------- GPS ----------------
 def read_gps():
     """TODO: read the NEO-6M (serial/NMEA or via the sketch).
     Return {"fix": True, "lat": ..., "lon": ...} when you have a fix."""
     return {"fix": False}
+
+
+# ---------------- System resources logger ----------------
+# Samples CPU / memory every ~5 s, stores them in the time-series DB, pushes live
+# values to the browser and serves history for the 1 h / 1 D charts.
+def on_get_samples(resource: str, start: str, aggr_window: str):
+    try:
+        samples = db.read_samples(measure=resource, start_from=start,
+                                  aggr_window=aggr_window, aggr_func="mean", limit=100)
+        return [{"ts": s[1], "value": s[2]} for s in samples]
+    except Exception as e:
+        print(f"get_samples failed: {e}", flush=True)
+        return []
+
+
+web_ui.expose_api("GET", "/get_samples/{resource}/{start}/{aggr_window}", on_get_samples)
+
+
+def resources_loop():
+    while True:
+        try:
+            ts = int(datetime.datetime.now().timestamp() * 1000)
+            cpu = psutil.cpu_percent(interval=1)
+            vm = psutil.virtual_memory()
+            db.write_sample("cpu", cpu, ts)
+            db.write_sample("mem", vm.percent, ts)
+            web_ui.send_message("cpu_usage", {"value": cpu, "ts": ts})
+            web_ui.send_message("memory_usage", {
+                "value": vm.percent, "ts": ts,
+                "used_gb": (vm.total - vm.available) / 1024 ** 3,
+                "total_gb": vm.total / 1024 ** 3,
+            })
+        except Exception as e:
+            print(f"resources_loop error: {e}", flush=True)
+        time.sleep(4)
+
+
+threading.Thread(target=resources_loop, daemon=True).start()
 
 
 # ---------------- Telemetry + watchdog ----------------
@@ -232,8 +245,6 @@ def telemetry_loop():
             "battery": 87,                    # TODO: real reading
             "heading": 0,                     # TODO: IMU / compass
             "gps": read_gps(),
-            "cpu": cpu_percent(),
-            "ram": ram_text(),
             "rpm": [round(left * 130), round(right * 130)],   # estimate from command
             "spraying": state["spraying"],
         })

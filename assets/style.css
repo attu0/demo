@@ -901,3 +901,41 @@
     .link-pill .ldot { width: 7px; height: 7px; border-radius: 50%; background: var(--status-red); }
     .link-pill.up { color: var(--text-secondary); }
     .link-pill.up .ldot { background: var(--status-green); }
+
+
+
+    /* ---- System Resources Logger ---- */
+    .sb-res-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 5px;
+      color: var(--text-secondary); cursor: pointer; padding: 0 8px; font: inherit; }
+    .sb-res-btn:hover { background: var(--bg-control-hover); }
+    .res-modal { position: fixed; inset: 0; z-index: 200; display: none; align-items: center;
+      justify-content: center; background: rgba(0,0,0,0.55); padding: 16px; }
+    .res-modal.show { display: flex; }
+    .res-card { width: min(1100px, 100%); max-height: calc(100vh - 32px); overflow: auto;
+      background: var(--bg-brick); border: 1px solid var(--border-color); border-radius: 10px;
+      box-shadow: var(--shadow-card); padding: 14px 16px 12px; }
+    .res-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .res-title { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13px;
+      letter-spacing: 1px; color: var(--arduino-teal-bright); text-transform: uppercase; margin-right: auto; }
+    .res-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--status-red); opacity: .35; }
+    .res-live-dot.flash { animation: resFlash 1s infinite alternate; opacity: 1; }
+    @keyframes resFlash { from { opacity: 1; } to { opacity: .1; } }
+    .res-tabs { display: inline-flex; gap: 4px; padding: 2px; border: 1px solid var(--border-color);
+      border-radius: 7px; background: var(--bg-panel-sub); }
+    .res-tab { border: 0; background: transparent; color: var(--text-muted); cursor: pointer;
+      font: 500 12px 'IBM Plex Sans', sans-serif; padding: 5px 16px; border-radius: 5px; }
+    .res-tab.active { background: var(--bg-control); color: var(--arduino-teal-bright);
+      font-weight: 700; box-shadow: 0 0 0 1px var(--border-color); }
+    .res-close { border: 0; background: transparent; color: var(--text-muted); font-size: 22px;
+      cursor: pointer; line-height: 1; padding: 0 6px; }
+    .res-close:hover { color: var(--text-main); }
+    .res-body { display: flex; gap: 14px; flex-wrap: wrap; }
+    .res-chart-box { flex: 1 1 420px; min-width: 0; background: var(--bg-panel-sub);
+      border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 12px; }
+    .res-chart-title { font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600;
+      color: var(--text-secondary); margin-bottom: 8px; letter-spacing: .5px; }
+    .res-canvas-wrap { position: relative; height: 210px; }
+    .res-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+    .res-nodata { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+      color: var(--text-muted); font-size: 12px; background: var(--bg-panel-sub); }
+    .res-hint { margin-top: 10px; font-size: 11px; color: var(--text-muted); }

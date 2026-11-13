@@ -420,7 +420,7 @@
       detectedBBox = res.bbox;
       scanLaserY = -1;
       cpuLoad = 6;
-      document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
+      if (!isConnected) document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
 
       document.getElementById('confPctTxt').textContent = `${Math.round(res.conf)}%`;
       const offset = 201 - (201 * res.conf) / 100;
@@ -457,7 +457,7 @@
             banner.className = 'nozzle-auto-banner';
             stateTxt.textContent = 'CYCLE COMPLETE • STANDBY';
             cpuLoad = 3;
-            document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
+            if (!isConnected) document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
           }, res.sprayMs);
         } else {
           isAutoSpraying = false;
@@ -466,7 +466,7 @@
           actionBar.textContent = `CNN Verified Healthy Leaf (${res.conf}%) -> Sprinkler Automatically Bypassed.`;
           logSerial(`CNN -> MEGA: <SPRY:SKIP,0>`);
           cpuLoad = 3;
-          document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
+          if (!isConnected) document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
         }
       }, 350);
     }
@@ -476,7 +476,7 @@
       detectedBBox = null;
       scanLaserY = 0;
       cpuLoad = 38;
-      document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
+      if (!isConnected) document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
       setPipelineStep(1);
       updateArmTarget(90, 85, 110, 'SCANNING');
 
@@ -817,3 +817,171 @@
       requestAnimationFrame(animateLoop);
     }
     animateLoop();
+
+
+// ==================== SYSTEM RESOURCES LOGGER ====================
+(function () {
+  const LIVE_MAX = 60;                 // 60 samples x 5 s = 5 min
+  const modal = document.getElementById('resModal');
+  const hint = document.getElementById('resHint');
+  const liveDot = document.getElementById('resLiveDot');
+  const charts = {
+    cpu: { canvas: document.getElementById('resCpuCanvas'), no: document.getElementById('resCpuNo'),
+           color: '#38BDF8', live: [], hist: { '1h': [], '1d': [] }, hover: -1, key: 'cpu' },
+    mem: { canvas: document.getElementById('resMemCanvas'), no: document.getElementById('resMemNo'),
+           color: '#10B981', live: [], hist: { '1h': [], '1d': [] }, hover: -1, key: 'mem' },
+  };
+  let tab = 'live', dotTimer = null;
+
+  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function fmt(ts, mode) {
+    const d = new Date(ts);
+    if (mode === 'live') return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (mode === '1h') return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString([], { hour: '2-digit' });
+  }
+  const pts = c => tab === 'live' ? c.live : c.hist[tab];
+
+  function draw(c) {
+    const cv = c.canvas, data = pts(c);
+    const dpr = window.devicePixelRatio || 1;
+    const W = cv.clientWidth, H = cv.clientHeight;
+    if (!W || !H) return;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    c.no.style.display = data.length ? 'none' : 'flex';
+    if (!data.length) return;
+
+    const L = 32, R = 10, T = 8, B = 26, pw = W - L - R, ph = H - T - B;
+    const muted = cssVar('--text-muted'), grid = cssVar('--border-subtle');
+    g.font = '10px "IBM Plex Mono", monospace';
+    g.textBaseline = 'middle'; g.textAlign = 'right';
+    for (let v = 0; v <= 100; v += 25) {
+      const y = T + ph - (v / 100) * ph;
+      g.strokeStyle = grid; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(L, y); g.lineTo(W - R, y); g.stroke();
+      g.fillStyle = muted; g.fillText(String(v), L - 6, y);
+    }
+    const n = data.length;
+    const xAt = i => n === 1 ? L + pw / 2 : L + (i / (n - 1)) * pw;
+    const yAt = v => T + ph - (Math.max(0, Math.min(100, v)) / 100) * ph;
+
+    // fill + line
+    const grad = g.createLinearGradient(0, T, 0, T + ph);
+    grad.addColorStop(0, c.color + '55'); grad.addColorStop(1, c.color + '05');
+    g.beginPath();
+    data.forEach((p, i) => i ? g.lineTo(xAt(i), yAt(p.value)) : g.moveTo(xAt(i), yAt(p.value)));
+    g.strokeStyle = c.color; g.lineWidth = 2; g.stroke();
+    g.lineTo(xAt(n - 1), T + ph); g.lineTo(xAt(0), T + ph); g.closePath();
+    g.fillStyle = grad; g.fill();
+    if (n === 1) { g.beginPath(); g.arc(xAt(0), yAt(data[0].value), 3, 0, 7); g.fillStyle = c.color; g.fill(); }
+
+    // x labels (about 6)
+    g.fillStyle = muted; g.textAlign = 'center'; g.textBaseline = 'top';
+    const step = Math.max(1, Math.ceil(n / 6));
+    for (let i = 0; i < n; i += step) g.fillText(fmt(data[i].ts, tab), xAt(i), T + ph + 8);
+
+    // hover tooltip
+    if (c.hover >= 0 && c.hover < n) {
+      const p = data[c.hover], x = xAt(c.hover), y = yAt(p.value);
+      g.strokeStyle = muted; g.setLineDash([3, 3]);
+      g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); g.setLineDash([]);
+      g.beginPath(); g.arc(x, y, 4, 0, 7); g.fillStyle = c.color; g.fill();
+      const txt = `${fmt(p.ts, tab)} - ${Number(p.value).toFixed(1)} %`;
+      g.font = '11px "IBM Plex Mono", monospace';
+      const tw = g.measureText(txt).width + 14;
+      const bx = Math.min(Math.max(x - tw / 2, L), W - R - tw), by = Math.max(y - 30, T);
+      g.fillStyle = cssVar('--bg-control'); g.strokeStyle = cssVar('--border-color');
+      g.beginPath(); g.roundRect(bx, by, tw, 20, 4); g.fill(); g.stroke();
+      g.fillStyle = cssVar('--text-main'); g.textAlign = 'left'; g.textBaseline = 'middle';
+      g.fillText(txt, bx + 7, by + 10);
+    }
+  }
+  const drawAll = () => { if (modal.classList.contains('show')) Object.values(charts).forEach(draw); };
+
+  Object.values(charts).forEach(c => {
+    c.canvas.addEventListener('mousemove', e => {
+      const data = pts(c); if (!data.length) return;
+      const r = c.canvas.getBoundingClientRect(), L = 32, R = 10, pw = r.width - L - R;
+      const f = (e.clientX - r.left - L) / pw;
+      c.hover = data.length === 1 ? 0 : Math.max(0, Math.min(data.length - 1, Math.round(f * (data.length - 1))));
+      draw(c);
+    });
+    c.canvas.addEventListener('mouseleave', () => { c.hover = -1; draw(c); });
+  });
+
+  // ---- live data (board pushes every 5 s) ----
+  function pushLive(c, msg) {
+    if (!msg || msg.ts == null || msg.value == null) return;
+    c.live.push({ ts: msg.ts, value: +msg.value });
+    if (c.live.length > LIVE_MAX) c.live.shift();
+  }
+  function liveTick() {
+    liveDot.classList.add('flash');
+    clearTimeout(dotTimer);
+    dotTimer = setTimeout(() => liveDot.classList.remove('flash'), 10000);
+    if (tab === 'live') drawAll();
+  }
+  socket.on('cpu_usage', m => {
+    pushLive(charts.cpu, m);
+    if (m && m.value != null) document.getElementById('cpuTxt').textContent = `${Math.round(m.value)}%`;
+    liveTick();
+  });
+  socket.on('memory_usage', m => {
+    pushLive(charts.mem, m);
+    if (m && m.used_gb != null) document.getElementById('ramTxt').textContent = `${m.used_gb.toFixed(2)}/${m.total_gb.toFixed(2)} GB`;
+    liveTick();
+  });
+
+  // Sim mode: synthetic live data so the panel can be demoed without the board
+  let simCpu = 12, simMem = 41;
+  setInterval(() => {
+    if (!isSimMode || isConnected) return;
+    simCpu = Math.max(2, Math.min(95, simCpu + (Math.random() - 0.5) * 12));
+    simMem = Math.max(20, Math.min(90, simMem + (Math.random() - 0.5) * 3));
+    const ts = Date.now();
+    pushLive(charts.cpu, { ts, value: simCpu });
+    pushLive(charts.mem, { ts, value: simMem });
+    if (tab === 'live') drawAll();
+  }, 2000);
+
+  // ---- history (REST on the board) ----
+  async function fetchSamples(resource, start, win, keep) {
+    try {
+      const r = await fetch(`/get_samples/${resource}/${start}/${win}`);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      return Array.isArray(d) ? d.slice(-keep) : [];
+    } catch (e) { return []; }
+  }
+  async function loadHistory(which) {
+    const [start, win, keep] = which === '1h' ? ['-1h', '5m', 12] : ['-1d', '1h', 24];
+    hint.textContent = 'Loading…';
+    const [cpu, mem] = await Promise.all([
+      fetchSamples('cpu', start, win, keep), fetchSamples('mem', start, win, keep)]);
+    charts.cpu.hist[which] = cpu; charts.mem.hist[which] = mem;
+    hint.textContent = which === '1h' ? 'Last hour, 5 minute averages.' : 'Last 24 hours, 1 hour averages.';
+    if (tab === which) drawAll();
+  }
+
+  // ---- tabs / open / close ----
+  document.querySelectorAll('.res-tab').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.res-tab').forEach(x => x.classList.toggle('active', x === b));
+    tab = b.dataset.rtab;
+    Object.values(charts).forEach(c => c.hover = -1);
+    if (tab === 'live') hint.textContent = 'Live: sampled every 5 s from the UNO Q.';
+    drawAll();
+    if (tab !== 'live') loadHistory(tab);
+  }));
+  const open = () => { modal.classList.add('show'); modal.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(() => { drawAll(); if (tab !== 'live') loadHistory(tab); }); };
+  const close = () => { modal.classList.remove('show'); modal.setAttribute('aria-hidden', 'true'); };
+  document.getElementById('resBtn').addEventListener('click', open);
+  document.getElementById('resClose').addEventListener('click', close);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  window.addEventListener('resize', drawAll);
+  new MutationObserver(drawAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+})();
