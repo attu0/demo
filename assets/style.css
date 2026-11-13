@@ -1,32 +1,57 @@
 :root {
-      --bg-workspace: #0B0F13;
-      --bg-brick: #131A20;
-      --bg-viewport: #080B0E;
-      --bg-panel-sub: #0F151A;
-      --border-color: #222D36;
-      --border-subtle: #1B242C;
+      /* Authentic Arduino App Lab Dark IDE Palette */
+      --bg-workspace: #0E1116;
+      --bg-brick: #161A22;
+      --bg-panel-sub: #1C212B;
+      --bg-viewport: #0A0D12;
+      --bg-control: #222834;
+      --bg-control-hover: #2B3342;
+      --border-color: #2A313E;
+      --border-subtle: #202631;
       --arduino-teal: #00979D;
-      --arduino-teal-bright: #00B5BC;
-      --arduino-teal-dim: rgba(0, 151, 157, 0.14);
-      --text-main: #E2E8F0;
+      --arduino-teal-bright: #00C2CB;
+      --arduino-teal-dim: rgba(0, 151, 157, 0.16);
+      --text-main: #F1F5F9;
       --text-secondary: #CBD5E1;
-      --text-muted: #64748B;
+      --text-muted: #8B9BB4;
+      --vp-chip-bg: rgba(14, 17, 22, 0.88);
+      --vp-chip-text: #E2E8F0;
+      --joy-bg-inner: #1B2430;
+      --joy-bg-outer: #0D1218;
+      --joy-border: #2E3B4E;
       --status-green: #10B981;
       --status-amber: #F59E0B;
       --status-red: #EF4444;
       --status-cyan: #38BDF8;
+      --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.45);
     }
 
     [data-theme="light"] {
-      --bg-workspace: #EEF2F6;
+      /* High-Contrast Authentic Arduino App Lab Light Palette */
+      --bg-workspace: #E2E8F0;
       --bg-brick: #FFFFFF;
-      --bg-viewport: #0D1217;
-      --bg-panel-sub: #F8FAFC;
+      --bg-panel-sub: #F1F5F9;
+      --bg-viewport: #F8FAFC;
+      --bg-control: #FFFFFF;
+      --bg-control-hover: #E2E8F0;
       --border-color: #CBD5E1;
       --border-subtle: #E2E8F0;
+      --arduino-teal: #008187;
+      --arduino-teal-bright: #00686D;
+      --arduino-teal-dim: rgba(0, 129, 135, 0.12);
       --text-main: #0F172A;
-      --text-secondary: #334155;
-      --text-muted: #64748B;
+      --text-secondary: #1E293B;
+      --text-muted: #475569;
+      --vp-chip-bg: rgba(255, 255, 255, 0.94);
+      --vp-chip-text: #0F172A;
+      --joy-bg-inner: #FFFFFF;
+      --joy-bg-outer: #E2E8F0;
+      --joy-border: #94A3B8;
+      --status-green: #059669;
+      --status-amber: #D97706;
+      --status-red: #DC2626;
+      --status-cyan: #0284C7;
+      --shadow-card: 0 4px 14px rgba(15, 23, 42, 0.08);
     }
 
     * {
@@ -44,74 +69,25 @@
       width: 100vw;
       overflow: hidden;
       display: flex;
+      flex-direction: column;
       -webkit-font-smoothing: antialiased;
+      transition: background-color 0.2s ease, color 0.2s ease;
     }
 
-    /* LEFT SIDEBAR RAIL */
-    .app-rail {
-      width: 48px;
-      background: var(--bg-brick);
-      border-right: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 12px 0;
-      gap: 12px;
-      z-index: 20;
-      flex-shrink: 0;
-    }
-
-    .uno-logo {
-      width: 34px;
-      height: 34px;
-      border-radius: 7px;
-      background: var(--arduino-teal-dim);
-      border: 1px solid var(--arduino-teal);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: var(--arduino-teal-bright);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 8.5px;
-      font-weight: 600;
-      line-height: 1.1;
-      letter-spacing: 0.02em;
-    }
-
-    .rail-btn {
-      width: 34px;
-      height: 34px;
-      border-radius: 6px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      transition: all 0.15s ease;
-    }
-
-    .rail-btn.active, .rail-btn:hover {
-      background: var(--arduino-teal-dim);
-      color: var(--arduino-teal-bright);
-      border-color: rgba(0, 151, 157, 0.45);
-    }
-
-    /* MAIN SHELL */
+    /* MAIN SHELL (Full Width - No Left Rail) */
     .main-shell {
       flex: 1;
       display: flex;
       flex-direction: column;
       height: 100vh;
+      width: 100vw;
       overflow: hidden;
+      position: relative;
     }
 
-    /* TOP HEADER */
+    /* TOP HEADER BAR */
     .top-header {
-      height: 52px;
+      height: 50px;
       background: var(--bg-brick);
       border-bottom: 1px solid var(--border-color);
       display: flex;
@@ -132,8 +108,8 @@
       width: 10px;
       height: 10px;
       border-radius: 2px;
-      background: var(--arduino-teal-bright);
-      box-shadow: 0 0 8px rgba(0, 181, 188, 0.5);
+      background: var(--arduino-teal);
+      box-shadow: 0 0 8px rgba(0, 151, 157, 0.5);
     }
 
     .brand-title {
@@ -150,14 +126,15 @@
     }
 
     .ws-input {
-      background: var(--bg-viewport);
+      background: var(--bg-panel-sub);
       border: 1px solid var(--border-color);
       color: var(--text-main);
       font-family: 'IBM Plex Mono', monospace;
       font-size: 11.5px;
-      padding: 6px 10px;
+      font-weight: 500;
+      padding: 5px 10px;
       border-radius: 5px;
-      width: 185px;
+      width: 190px;
       outline: none;
       transition: border-color 0.15s;
     }
@@ -168,17 +145,20 @@
     .btn-primary {
       background: var(--arduino-teal);
       color: #FFFFFF;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 6px 13px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 6px 12px;
       border-radius: 5px;
       font-family: 'IBM Plex Sans', sans-serif;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: filter 0.15s ease;
     }
     .btn-primary:hover {
-      background: var(--arduino-teal-bright);
+      filter: brightness(1.1);
     }
 
     .btn-secondary {
@@ -189,7 +169,7 @@
       border-radius: 5px;
       font-family: 'IBM Plex Sans', sans-serif;
       font-size: 11.5px;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.15s ease;
     }
@@ -214,7 +194,7 @@
     .sim-switch {
       width: 30px;
       height: 16px;
-      background: #2A343D;
+      background: #64748B;
       border-radius: 99px;
       position: relative;
       transition: 0.2s;
@@ -227,25 +207,49 @@
       width: 12px;
       height: 12px;
       border-radius: 50%;
-      background: #CBD5E1;
+      background: #FFFFFF;
       transition: 0.2s;
     }
     .sim-toggle-wrap.active {
-      border-color: rgba(16, 185, 129, 0.5);
-      background: rgba(16, 185, 129, 0.1);
+      border-color: var(--status-green);
+      background: rgba(16, 185, 129, 0.12);
     }
     .sim-toggle-wrap.active .sim-switch {
       background: var(--status-green);
     }
     .sim-toggle-wrap.active .sim-switch::after {
       transform: translateX(14px);
-      background: #FFFFFF;
     }
     .sim-label {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 11px;
-      font-weight: 500;
-      color: var(--text-secondary);
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* TOP-RIGHT THEME TOGGLE BUTTON (Beside Sim Mode) */
+    .theme-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-panel-sub);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 5px 11px;
+      border-radius: 5px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .theme-toggle-btn:hover {
+      border-color: var(--arduino-teal);
+      color: var(--arduino-teal-bright);
+    }
+    .theme-toggle-btn i {
+      color: var(--arduino-teal-bright);
+      font-size: 12px;
     }
 
     /* 3-COLUMN BENTO GRID */
@@ -254,20 +258,23 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 12px;
-      padding: 12px 16px;
+      padding: 10px 14px;
       overflow: hidden;
+      min-height: 0;
     }
 
     .brick-card {
       background: var(--bg-brick);
       border: 1px solid var(--border-color);
-      border-top: 2px solid var(--arduino-teal);
+      border-top: 2.5px solid var(--arduino-teal);
       border-radius: 8px;
       display: flex;
       flex-direction: column;
-      padding: 12px 14px;
-      gap: 10px;
+      padding: 10px 12px;
+      gap: 9px;
       overflow: hidden;
+      min-height: 0;
+      box-shadow: var(--shadow-card);
     }
 
     .brick-header {
@@ -275,15 +282,21 @@
       align-items: center;
       justify-content: space-between;
       flex-shrink: 0;
-      padding-bottom: 4px;
+      padding-bottom: 5px;
       border-bottom: 1px solid var(--border-subtle);
     }
 
     .brick-title {
-      font-size: 13.5px;
-      font-weight: 600;
+      font-size: 13px;
+      font-weight: 700;
       color: var(--text-main);
-      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .brick-title i {
+      color: var(--arduino-teal-bright);
+      font-size: 12px;
     }
 
     .brick-status {
@@ -291,9 +304,9 @@
       align-items: center;
       gap: 6px;
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--text-muted);
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
     }
 
     .dot {
@@ -314,175 +327,266 @@
       position: relative;
       overflow: hidden;
       background-image:
-        linear-gradient(rgba(0, 151, 157, 0.045) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 151, 157, 0.045) 1px, transparent 1px);
+        linear-gradient(rgba(0, 151, 157, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 151, 157, 0.07) 1px, transparent 1px);
       background-size: 20px 20px;
     }
 
-    .vp-rover { height: 175px; flex-shrink: 0; }
-    .vp-arm   { height: 235px; flex-shrink: 0; }
-    .vp-leaf  { height: 185px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .vp-rover { height: 170px; flex-shrink: 0; }
+    .vp-arm   { height: 205px; flex-shrink: 0; }
+    .vp-leaf  { height: 180px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 
     .vp-badge-overlay {
       position: absolute;
-      top: 8px;
+      top: 7px;
       left: 8px;
       right: 8px;
       display: flex;
       justify-content: space-between;
       pointer-events: none;
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 10.5px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .vp-badge-bottom {
+      position: absolute;
+      bottom: 7px;
+      left: 8px;
+      right: 8px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
     }
 
     .vp-chip {
-      background: rgba(11, 15, 19, 0.85);
+      background: var(--vp-chip-bg);
       border: 1px solid var(--border-color);
       padding: 2px 7px;
       border-radius: 4px;
-      color: var(--text-secondary);
+      color: var(--vp-chip-text);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
     }
 
-    /* PANEL 1: LOCOMOTION CONTROLS */
-    .locomotion-controls {
-      flex: 1;
+    /* PANEL 1: MODE TOGGLE SWITCHER (JOYSTICK OR BUTTONS) */
+    .control-mode-switcher {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 4px;
+      background: var(--bg-panel-sub);
+      border: 1px solid var(--border-color);
+      padding: 3px;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+
+    .mode-tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .mode-tab-btn.active {
+      background: var(--bg-brick);
+      color: var(--arduino-teal-bright);
+      border-color: var(--arduino-teal);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    }
+
+    .locomotion-stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
       min-height: 0;
     }
 
-    .sub-box {
+    .control-pane {
+      flex: 1;
       background: var(--bg-panel-sub);
       border: 1px solid var(--border-color);
       border-radius: 6px;
-      padding: 10px;
-      display: flex;
+      padding: 10px 12px;
+      display: none;
       flex-direction: column;
       align-items: center;
       justify-content: space-between;
+      min-height: 0;
+    }
+    .control-pane.active {
+      display: flex;
     }
 
-    .sub-title {
+    .pane-header {
       width: 100%;
-      font-size: 11.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
       font-weight: 600;
       color: var(--text-secondary);
     }
 
-    /* JOYSTICK */
+    /* PROPORTIONAL JOYSTICK */
     .joy-base {
-      width: 114px;
-      height: 114px;
+      width: 128px;
+      height: 128px;
       border-radius: 50%;
-      background: radial-gradient(circle, #141D24 0%, #090D10 100%);
-      border: 1px solid #26333D;
+      background: radial-gradient(circle, var(--joy-bg-inner) 0%, var(--joy-bg-outer) 100%);
+      border: 1.5px solid var(--joy-border);
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       touch-action: none;
       cursor: grab;
+      margin: auto 0;
     }
     .joy-base::before {
       content: '';
-      width: 70px;
-      height: 70px;
+      width: 78px;
+      height: 78px;
       border-radius: 50%;
-      border: 1px dashed rgba(0, 151, 157, 0.3);
+      border: 1px dashed var(--arduino-teal);
+      opacity: 0.55;
+      position: absolute;
+    }
+    .joy-base::after {
+      content: '';
+      width: 100%;
+      height: 1px;
+      background: var(--border-color);
       position: absolute;
     }
     .joy-stick {
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      background: radial-gradient(circle at 32% 32%, #00B5BC, #006B70);
-      border: 1.5px solid #67E8F9;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
+      background: radial-gradient(circle at 32% 32%, #00C2CB, #00767B);
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 4px 12px rgba(0, 151, 157, 0.5);
       position: absolute;
       pointer-events: none;
+      z-index: 2;
     }
 
     .joy-metrics {
       width: 100%;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 4px;
+      gap: 6px;
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 10.5px;
+      font-size: 11px;
+      font-weight: 600;
       text-align: center;
     }
     .joy-metric-item {
-      background: var(--bg-viewport);
+      background: var(--bg-brick);
       border: 1px solid var(--border-color);
-      padding: 3px 2px;
+      padding: 4px 4px;
       border-radius: 4px;
       color: var(--arduino-teal-bright);
     }
 
-    /* D-PAD */
+    /* DIRECTIONAL D-PAD */
     .dpad-grid {
       display: grid;
-      grid-template-columns: repeat(3, 44px);
-      grid-template-rows: repeat(3, 38px);
-      gap: 5px;
+      grid-template-columns: repeat(3, 68px);
+      grid-template-rows: repeat(3, 44px);
+      gap: 6px;
       margin: auto 0;
     }
 
     .dpad-btn {
-      background: #172027;
-      border: 1px solid #2B3945;
-      border-radius: 5px;
+      background: var(--bg-control);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
       color: var(--text-main);
       font-family: 'IBM Plex Sans', sans-serif;
-      font-size: 10.5px;
-      font-weight: 600;
+      font-size: 11.5px;
+      font-weight: 700;
       cursor: pointer;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       transition: all 0.1s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+    .dpad-btn:hover {
+      background: var(--bg-control-hover);
+      border-color: var(--arduino-teal);
     }
     .dpad-btn span {
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 8.5px;
-      color: var(--text-muted);
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--arduino-teal-bright);
     }
     .dpad-btn:active, .dpad-btn.active {
       background: var(--arduino-teal);
       border-color: var(--arduino-teal-bright);
-      color: #FFF;
-      transform: scale(0.96);
+      color: #FFFFFF;
+      transform: scale(0.95);
+    }
+    .dpad-btn:active span, .dpad-btn.active span {
+      color: #E0F2FE;
     }
     .dpad-btn.stop-btn {
-      background: rgba(239, 68, 68, 0.15);
-      border-color: rgba(239, 68, 68, 0.5);
-      color: #FCA5A5;
+      background: rgba(239, 68, 68, 0.14);
+      border-color: var(--status-red);
+      color: var(--status-red);
+    }
+    .dpad-btn.stop-btn span {
+      color: var(--status-red);
     }
     .dpad-btn.stop-btn:active, .dpad-btn.stop-btn.active {
       background: var(--status-red);
-      color: #FFF;
+      color: #FFFFFF;
+    }
+    .dpad-btn.stop-btn:active span, .dpad-btn.stop-btn.active span {
+      color: #FFFFFF;
     }
 
-    /* PANEL 2: 3-DOF SLIDERS (EXPANDED CLEAN LAYOUT) */
+    /* PANEL 2: 3-DOF POSES & SLIDERS */
+    .pose-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
     .sliders-stack {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       flex: 1;
       justify-content: space-between;
+      min-height: 0;
     }
 
     .slider-card {
       background: var(--bg-panel-sub);
       border: 1px solid var(--border-color);
       border-radius: 6px;
-      padding: 8px 11px;
+      padding: 6px 11px;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 5px;
+      gap: 4px;
       flex: 1;
     }
 
@@ -490,15 +594,15 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 12px;
-      font-weight: 500;
+      font-size: 11.5px;
+      font-weight: 600;
       color: var(--text-secondary);
     }
     .slider-val {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 12px;
       color: var(--arduino-teal-bright);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     input[type="range"] {
@@ -511,36 +615,37 @@
     .nozzle-auto-banner {
       background: var(--bg-panel-sub);
       border: 1px solid var(--border-color);
-      border-left: 3px solid var(--arduino-teal);
+      border-left: 3.5px solid var(--arduino-teal);
       border-radius: 5px;
-      padding: 8px 11px;
+      padding: 7px 11px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 12px;
+      font-size: 11.5px;
       flex-shrink: 0;
     }
     .nozzle-auto-banner span {
       color: var(--text-secondary);
-      font-weight: 500;
+      font-weight: 600;
     }
     .nozzle-auto-banner strong {
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 11.5px;
+      font-size: 11px;
       color: var(--arduino-teal-bright);
+      font-weight: 700;
     }
     .nozzle-auto-banner.spraying {
       border-left-color: var(--status-green);
-      background: rgba(16, 185, 129, 0.1);
+      background: rgba(16, 185, 129, 0.12);
     }
     .nozzle-auto-banner.spraying strong {
-      color: #34D399;
+      color: var(--status-green);
     }
     .nozzle-auto-banner.bypassed {
       border-left-color: var(--status-cyan);
     }
     .nozzle-auto-banner.bypassed strong {
-      color: #7DD3FC;
+      color: var(--status-cyan);
     }
 
     /* PANEL 3: LEAF VISION & DIAGNOSIS */
@@ -548,14 +653,14 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 6px;
+      gap: 5px;
       flex-shrink: 0;
     }
 
     .cam-actions-left {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
     }
 
     .pipeline-steps {
@@ -567,8 +672,9 @@
     .pipe-step {
       font-family: 'IBM Plex Mono', monospace;
       font-size: 10px;
+      font-weight: 500;
       text-align: center;
-      padding: 5px 4px;
+      padding: 4px 3px;
       border-radius: 4px;
       background: var(--bg-panel-sub);
       border: 1px solid var(--border-color);
@@ -579,7 +685,7 @@
       background: var(--arduino-teal-dim);
       color: var(--arduino-teal-bright);
       border-color: var(--arduino-teal);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .cnn-results-box {
@@ -587,16 +693,17 @@
       background: var(--bg-panel-sub);
       border: 1px solid var(--border-color);
       border-radius: 6px;
-      padding: 10px 12px;
+      padding: 8px 11px;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: space-between;
+      min-height: 0;
     }
 
     .cnn-grid {
       display: grid;
-      grid-template-columns: 95px 1fr;
-      gap: 12px;
+      grid-template-columns: 88px 1fr;
+      gap: 10px;
       align-items: center;
     }
 
@@ -610,69 +717,177 @@
     .prob-list {
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 6px;
     }
     .prob-row {
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 2px;
     }
     .prob-label {
       display: flex;
       justify-content: space-between;
       font-size: 11px;
+      font-weight: 500;
       color: var(--text-secondary);
     }
     .prob-label span:last-child {
       font-family: 'IBM Plex Mono', monospace;
+      font-weight: 600;
       color: var(--text-main);
     }
     .prob-track {
       height: 5px;
       background: var(--bg-viewport);
+      border: 1px solid var(--border-subtle);
       border-radius: 99px;
       overflow: hidden;
     }
     .prob-fill {
       height: 100%;
       width: 0%;
-      background: var(--arduino-teal-bright);
+      background: var(--arduino-teal);
       transition: width 0.35s ease;
     }
 
-    /* FOOTER */
-    .serial-footer {
-      height: 28px;
+    .cnn-decision-bar {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      padding: 5px 8px;
+      border-radius: 4px;
+      background: var(--bg-brick);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ================= AUTHENTIC ARDUINO APP LAB BOTTOM STATUS BAR ================= */
+    .applab-statusbar {
+      height: 32px;
       background: var(--bg-brick);
       border-top: 1px solid var(--border-color);
-      padding: 0 16px;
+      padding: 0 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       font-family: 'IBM Plex Mono', monospace;
       font-size: 11px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       flex-shrink: 0;
+      z-index: 30;
     }
 
-    /* TOAST */
+    .sb-left, .sb-center, .sb-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sb-board-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-panel-sub);
+      border: 1px solid var(--border-color);
+      padding: 2px 9px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .sb-board-pill i {
+      color: var(--arduino-teal-bright);
+    }
+
+    .sb-metric {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--bg-panel-sub);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .sb-metric i {
+      color: var(--text-muted);
+      font-size: 10.5px;
+    }
+    .sb-metric.gps-metric {
+      border-color: rgba(0, 151, 157, 0.4);
+      background: var(--arduino-teal-dim);
+      color: var(--arduino-teal-bright);
+      font-weight: 600;
+    }
+    .sb-metric.gps-metric i {
+      color: var(--arduino-teal-bright);
+    }
+
+    .sb-stop-btn {
+      background: rgba(239, 68, 68, 0.16);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: var(--status-red);
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .sb-stop-btn:hover {
+      background: var(--status-red);
+      color: #FFFFFF;
+    }
+
+    /* TOAST ALERT — MOVED UPWARD (bottom: 54px) SO IT NEVER COVERS BOTTOM STATUS BAR */
     .toast-alert {
       position: fixed;
-      bottom: 40px;
-      right: 18px;
-      background: #161F27;
-      border: 1px solid var(--status-amber);
+      bottom: 54px;
+      right: 20px;
+      background: var(--bg-brick);
+      border: 1.5px solid var(--status-amber);
+      border-left: 5px solid var(--status-amber);
       color: var(--text-main);
       padding: 10px 14px;
       border-radius: 6px;
       font-size: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-      transform: translateY(150%);
-      transition: transform 0.22s ease;
+      font-weight: 500;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transform: translateY(220%);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.22s ease, opacity 0.22s ease;
       z-index: 100;
     }
     .toast-alert.show {
       transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .toast-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .toast-close-btn:hover {
+      color: var(--text-main);
+      background: var(--bg-panel-sub);
     }
 
     /* ---- additions for Socket.IO port ---- */
@@ -686,4 +901,3 @@
     .link-pill .ldot { width: 7px; height: 7px; border-radius: 50%; background: var(--status-red); }
     .link-pill.up { color: var(--text-secondary); }
     .link-pill.up .ldot { background: var(--status-green); }
-    .foot-telem { display: flex; gap: 14px; }

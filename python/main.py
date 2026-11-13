@@ -123,23 +123,28 @@ def spray_for(ms):
 CLASSES = {
     "early_blight":   {"title": "Early Blight",    "spray_ms": 2500},
     "powdery_mildew": {"title": "Powdery Mildew",  "spray_ms": 2200},
-    "healthy":        {"title": "Healthy Foliage", "spray_ms": 0},
+    "healthy":        {"title": "Healthy",         "spray_ms": 0},
 }
 _demo_idx = 0
 
 
-def run_inference(source, image_b64):
+def run_inference(source, image_b64, sample_hint=None):
     """
     TODO: replace with the real CNN.
-      source    : "arm_camera" | "webcam" | "upload"
-      image_b64 : data-URL JPEG (224x224) for webcam/upload, None for arm_camera
-                  (grab the frame from the board camera yourself in that case)
+      source      : "arm_camera" | "upload"
+      image_b64   : data-URL JPEG (224x224) for "upload", None for "arm_camera"
+                    (grab the frame from the board camera yourself in that case)
+      sample_hint : the Blight/Mildew/Healthy button selected in the UI. Demo only:
+                    the stub honours it, a real model must ignore it.
     Return probabilities in this order: early blight, late blight, powdery mildew, healthy.
     This stub cycles through demo results so the whole pipeline can be tested.
     """
     global _demo_idx
-    key = list(CLASSES)[_demo_idx % len(CLASSES)]
-    _demo_idx += 1
+    if sample_hint in CLASSES:
+        key = sample_hint
+    else:
+        key = list(CLASSES)[_demo_idx % len(CLASSES)]
+        _demo_idx += 1
     top = round(random.uniform(90, 98), 1)
     rest = round(100 - top, 1)
     probs = {"eb": 0.0, "lb": 0.0, "pm": 0.0, "hl": 0.0}
@@ -155,9 +160,11 @@ def run_inference(source, image_b64):
 
 def on_cnn_predict(sid, data):
     def work():
-        key, conf, probs = run_inference(data.get("source", "arm_camera"), data.get("image"))
+        key, conf, probs = run_inference(
+            data.get("source", "arm_camera"), data.get("image"), data.get("sample"))
         info = CLASSES[key]
         web_ui.send_message("cnn_result", {
+            "sample": key,
             "title": info["title"],
             "conf": conf,
             "probs": probs,
@@ -175,6 +182,43 @@ for name, fn in [("drive", on_drive), ("estop", on_estop), ("arm", on_arm),
     web_ui.on_message(name, fn)
 
 
+# ---------------- System stats (Linux side of the UNO Q) ----------------
+_last_cpu = None
+
+
+def cpu_percent():
+    global _last_cpu
+    try:
+        with open("/proc/stat") as f:
+            vals = [int(x) for x in f.readline().split()[1:]]
+        idle, total = vals[3] + vals[4], sum(vals)
+        prev, _last_cpu = _last_cpu, (idle, total)
+        if prev is None or total == prev[1]:
+            return 0.0
+        return 100.0 * (1 - (idle - prev[0]) / (total - prev[1]))
+    except Exception:
+        return None
+
+
+def ram_text():
+    try:
+        info = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, v = line.split(":")
+                info[k] = int(v.split()[0])       # kB
+        used = (info["MemTotal"] - info["MemAvailable"]) / 1048576
+        return f"{used:.2f}/{info['MemTotal'] / 1048576:.2f} GB"
+    except Exception:
+        return None
+
+
+def read_gps():
+    """TODO: read the NEO-6M (serial/NMEA or via the sketch).
+    Return {"fix": True, "lat": ..., "lon": ...} when you have a fix."""
+    return {"fix": False}
+
+
 # ---------------- Telemetry + watchdog ----------------
 def telemetry_loop():
     while True:
@@ -187,6 +231,9 @@ def telemetry_loop():
         web_ui.send_message("telemetry", {
             "battery": 87,                    # TODO: real reading
             "heading": 0,                     # TODO: IMU / compass
+            "gps": read_gps(),
+            "cpu": cpu_percent(),
+            "ram": ram_text(),
             "rpm": [round(left * 130), round(right * 130)],   # estimate from command
             "spraying": state["spraying"],
         })
