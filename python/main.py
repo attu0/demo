@@ -128,7 +128,7 @@ def spray_for(ms):
 CLASSES = {
     "early_blight":   {"title": "Early Blight",    "spray_ms": 2500},
     "powdery_mildew": {"title": "Powdery Mildew",  "spray_ms": 2200},
-    "healthy":        {"title": "Healthy",         "spray_ms": 0},
+    "healthy":        {"title": "Healthy Leaf",    "spray_ms": 0},
 }
 _demo_idx = 0
 

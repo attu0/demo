@@ -1,33 +1,30 @@
-// ==================== STATE ====================
+// ==================== APPLICATION STATE ====================
     let isSimMode = false;
     let isConnected = false;
     const socket = io();
 
-    // Rover & GPS state
+    // Rover + Live GPS coordinates
     let roverState = {
       dir: 'STOP',
       vx: 0,
       vy: 0,
-      treadOffset: 0,
       rpmL: 0,
       rpmR: 0,
-      heading: 0,
       lat: 17.05420,
       lon: 74.26380
     };
 
-    // 3-DOF Arm state
+    // 3-DOF Arm Joint State
     let armCur = { base: 90, shoulder: 115, elbow: 75 };
     let armTgt = { base: 90, shoulder: 115, elbow: 75 };
     let isAutoSpraying = false;
     let sprayParticles = [];
 
-    // Leaf CNN state
+    // Plant Leaf CNN State
     let currentLeafSample = 'early_blight';
     let uploadedLeafImg = null;
     let scanLaserY = -1;
     let detectedBBox = null;
-    let cpuLoad = 3;
 
     const LEAF_SAMPLES = {
       early_blight: {
@@ -36,7 +33,11 @@
         probs: { eb: 94.6, lb: 3.1, pm: 1.4, hl: 0.9 },
         sprayMs: 2600,
         bbox: { x: 135, y: 42, w: 145, h: 82, color: '#EF4444' },
-        lesions: [{x: 185, y: 75, r: 16, c: '#5C3A21'}, {x: 230, y: 92, r: 13, c: '#4A2C18'}, {x: 165, y: 98, r: 10, c: '#6E472B'}]
+        lesions: [
+          { x: 185, y: 75, r: 16, c: '#5C3A21' },
+          { x: 230, y: 92, r: 13, c: '#4A2C18' },
+          { x: 165, y: 98, r: 10, c: '#6E472B' }
+        ]
       },
       powdery_mildew: {
         title: 'Powdery Mildew',
@@ -44,10 +45,14 @@
         probs: { eb: 4.2, lb: 2.5, pm: 91.8, hl: 1.5 },
         sprayMs: 2200,
         bbox: { x: 140, y: 38, w: 150, h: 86, color: '#F59E0B' },
-        lesions: [{x: 190, y: 68, r: 18, c: '#CBD5E1'}, {x: 235, y: 88, r: 15, c: '#E2E8F0'}, {x: 165, y: 95, r: 12, c: '#94A3B8'}]
+        lesions: [
+          { x: 190, y: 68, r: 18, c: '#CBD5E1' },
+          { x: 235, y: 88, r: 15, c: '#E2E8F0' },
+          { x: 165, y: 95, r: 12, c: '#94A3B8' }
+        ]
       },
       healthy: {
-        title: 'Healthy',
+        title: 'Healthy Leaf',
         conf: 98.4,
         probs: { eb: 0.6, lb: 0.4, pm: 0.6, hl: 98.4 },
         sprayMs: 0,
@@ -56,9 +61,9 @@
       }
     };
 
-    // ==================== HELPERS ====================
+    // ==================== LOGGING & HARDWARE GATING ====================
     function logSerial(msg) {
-      document.getElementById('serialLogTxt').textContent = msg;
+      document.getElementById('serialLogTxt').textContent = `>_ ${msg}`;
     }
 
     let toastTimer = null;
@@ -73,7 +78,6 @@
 
     document.getElementById('toastCloseBtn').addEventListener('click', () => {
       document.getElementById('toastAlert').classList.remove('show');
-      clearTimeout(toastTimer);
     });
 
     // Send one event to the board. `type` is the Socket.IO event name.
@@ -83,7 +87,7 @@
       if (!quiet) logSerial(`TX -> UNO Q: ${type}`);
     }
 
-    // ==================== SIM MODE & TOP-RIGHT THEME TOGGLE ====================
+    // ==================== TOP-RIGHT SIM MODE & THEME SWITCHER ====================
     const simToggle = document.getElementById('simToggle');
     const simLabel = document.getElementById('simLabel');
 
@@ -91,55 +95,38 @@
       isSimMode = !isSimMode;
       simToggle.classList.toggle('active', isSimMode);
       simLabel.textContent = isSimMode ? 'Sim Mode: ON' : 'Sim Mode: OFF';
-      if (!isSimMode && !isConnected) {
+
+      if (isSimMode) {
+        document.getElementById('toastAlert').classList.remove('show');
+        logSerial('Sim Mode: ON — 60FPS Rover, 3-DOF Arm & CNN Auto-Sprinkler enabled');
+      } else if (!isConnected) {
         roverState.dir = 'STOP';
-        roverState.vx = 0; roverState.vy = 0;
-        roverState.rpmL = 0; roverState.rpmR = 0;
+        roverState.rpmL = 0;
+        roverState.rpmR = 0;
         isAutoSpraying = false;
         detectedBBox = null;
+        logSerial('Sim Mode: OFF — Hardware standby');
       }
-      logSerial(isSimMode ? 'Sim Mode ON • 60FPS Visualizers Active' : 'Sim Mode OFF • Hardware Gating Active');
     });
 
-    // Theme Switcher in Top-Right Header Corner
-    const themeBtn = document.getElementById('themeBtn');
-    const themeIcon = document.getElementById('themeIcon');
-    const themeText = document.getElementById('themeText');
-
-    themeBtn.addEventListener('click', () => {
+    document.getElementById('themeBtn').addEventListener('click', () => {
       const html = document.documentElement;
-      const nextTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-      html.setAttribute('data-theme', nextTheme);
-      if (nextTheme === 'light') {
-        themeIcon.className = 'fa-solid fa-moon';
-        themeText.textContent = 'Dark Mode';
-      } else {
-        themeIcon.className = 'fa-solid fa-sun';
-        themeText.textContent = 'Light Mode';
-      }
-    });
-
-    // ==================== CONTROL MODE TOGGLE (EITHER JOYSTICK OR BUTTONS) ====================
-    document.querySelectorAll('.mode-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.mode-tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const mode = btn.dataset.mode;
-        document.getElementById('paneJoystick').classList.toggle('active', mode === 'joystick');
-        document.getElementById('paneButtons').classList.toggle('active', mode === 'buttons');
-        if (isConnected || isSimMode) setRoverDrive('STOP');
-      });
+      const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      document.getElementById('themeIcon').textContent = next === 'dark' ? '☀️' : '🌙';
+      document.getElementById('themeTxt').textContent = next === 'dark' ? 'Light Mode' : 'Dark Mode';
     });
 
     // ==================== SOCKET.IO CONNECTION ====================
     const linkPill = document.getElementById('linkPill');
     const linkTxt = document.getElementById('linkTxt');
+    const connectBtn = document.getElementById('connectBtn');
 
     function setLink(up, text) {
       isConnected = up;
       linkPill.classList.toggle('up', up);
       linkTxt.textContent = text;
-      document.getElementById('connectBtnTxt').textContent = up ? 'Reconnect' : 'Connect UNO Q';
+      connectBtn.textContent = up ? 'Reconnect' : 'Connect UNO Q';
     }
 
     socket.on('connect', () => { setLink(true, 'UNO Q linked'); logSerial('Connected to UNO Q'); });
@@ -150,17 +137,17 @@
     });
     socket.on('connect_error', () => setLink(false, 'Connecting…'));
 
-    document.getElementById('connectBtn').addEventListener('click', () => {
+    connectBtn.addEventListener('click', () => {
       if (socket.connected) socket.disconnect();
       setTimeout(() => socket.connect(), 150);
     });
 
     socket.on('telemetry', t => {
-      if (t.gps && t.gps.fix) { roverState.lat = +t.gps.lat; roverState.lon = +t.gps.lon; }
-      if (t.heading != null) roverState.heading = +t.heading;
-      updateGpsDisplay();
-      if (t.cpu != null) document.getElementById('cpuTxt').textContent = `${Math.round(t.cpu)}%`;
-      if (t.ram) document.getElementById('ramTxt').textContent = t.ram;
+      if (t.gps && t.gps.fix) {
+        roverState.lat = +t.gps.lat; roverState.lon = +t.gps.lon;
+        document.getElementById('gpsLatTxt').textContent = `LAT: ${roverState.lat.toFixed(4)}° N`;
+        document.getElementById('gpsLonTxt').textContent = `LON: ${roverState.lon.toFixed(4)}° E`;
+      }
       if (!isSimMode && t.rpm) {
         roverState.rpmL = t.rpm[0]; roverState.rpmR = t.rpm[1];
         document.getElementById('rpmLeftTxt').textContent = `L: ${Math.round(t.rpm[0])} RPM`;
@@ -170,15 +157,27 @@
     socket.on('log', m => logSerial(m));
     socket.on('cnn_result', data => applyCNNResult(data));
 
-    function updateGpsDisplay() {
-      const latStr = roverState.lat.toFixed(4);
-      const lonStr = roverState.lon.toFixed(4);
-      document.getElementById('gpsCoordTxt').innerHTML = `LAT: ${latStr}° N &nbsp; LON: ${lonStr}° E`;
-      document.getElementById('vpGpsChip').innerHTML = `<i class="fa-solid fa-satellite-dish" style="color:var(--arduino-teal-bright);"></i> ${latStr}°N, ${lonStr}°E`;
-      document.getElementById('vpHdgChip').textContent = `HDG: ${Math.round(roverState.heading)}°`;
-    }
+    // ==================== CONTROL MODE TOGGLE (JOYSTICK vs D-PAD) ====================
+    const tabJoy = document.getElementById('tabJoy');
+    const tabDpad = document.getElementById('tabDpad');
+    const joyContainer = document.getElementById('joyContainer');
+    const dpadContainer = document.getElementById('dpadContainer');
 
-    // ==================== PANEL 1: ROVER D-PAD & 360 JOYSTICK ====================
+    tabJoy.addEventListener('click', () => {
+      tabJoy.classList.add('active');
+      tabDpad.classList.remove('active');
+      joyContainer.classList.add('active-control');
+      dpadContainer.classList.remove('active-control');
+    });
+
+    tabDpad.addEventListener('click', () => {
+      tabDpad.classList.add('active');
+      tabJoy.classList.remove('active');
+      dpadContainer.classList.add('active-control');
+      joyContainer.classList.remove('active-control');
+    });
+
+    // ==================== LOCOMOTION: D-PAD & JOYSTICK ====================
     // Board watchdog stops the rover if no "drive" arrives for 0.5 s,
     // so the current command is re-sent at 10 Hz while it is non-zero.
     let driveCmd = { linear: 0, angular: 0 };
@@ -202,24 +201,21 @@
       document.getElementById('roverVecTxt').textContent = 'Idle';
     }
 
-    function setRoverDrive(dir, vx = 0, vy = 0) {
+    function setRoverDrive(dir) {
       if (!requireActiveHardware()) return;
       roverState.dir = dir;
-      roverState.vx = vx;
-      roverState.vy = vy;
-
       // linear: +forward, angular: +left (matches main.py)
       let lin = 0, ang = 0;
-      if (dir === 'FORWARD')       { roverState.rpmL = 120;  roverState.rpmR = 120;  roverState.vy = 1;  lin = 0.6; }
-      else if (dir === 'BACKWARD') { roverState.rpmL = -120; roverState.rpmR = -120; roverState.vy = -1; lin = -0.6; }
-      else if (dir === 'LEFT')     { roverState.rpmL = -95;  roverState.rpmR = 95;   roverState.vx = -1; ang = 0.6; }
-      else if (dir === 'RIGHT')    { roverState.rpmL = 95;   roverState.rpmR = -95;  roverState.vx = 1;  ang = -0.6; }
-      else if (dir === 'STOP')     { roverState.rpmL = 0; roverState.rpmR = 0; roverState.vx = 0; roverState.vy = 0; }
+      if (dir === 'FORWARD')       { roverState.rpmL = 120;  roverState.rpmR = 120;  roverState.vx = 0;  roverState.vy = 1;  lin = 0.6; }
+      else if (dir === 'BACKWARD') { roverState.rpmL = -120; roverState.rpmR = -120; roverState.vx = 0;  roverState.vy = -1; lin = -0.6; }
+      else if (dir === 'LEFT')     { roverState.rpmL = -95;  roverState.rpmR = 95;   roverState.vx = -1; roverState.vy = 0;  ang = 0.6; }
+      else if (dir === 'RIGHT')    { roverState.rpmL = 95;   roverState.rpmR = -95;  roverState.vx = 1;  roverState.vy = 0;  ang = -0.6; }
+      else                         { roverState.rpmL = 0; roverState.rpmR = 0; roverState.vx = 0; roverState.vy = 0; }
 
       document.getElementById('roverStateTxt').textContent = dir === 'STOP' ? 'Standby' : dir;
-      document.getElementById('rpmLeftTxt').textContent = `L: ${Math.round(roverState.rpmL)} RPM`;
-      document.getElementById('rpmRightTxt').textContent = `R: ${Math.round(roverState.rpmR)} RPM`;
-      document.getElementById('roverVecTxt').textContent = dir === 'STOP' ? 'Idle' : `CMD: ${dir}`;
+      document.getElementById('rpmLeftTxt').textContent = `L: ${roverState.rpmL} RPM`;
+      document.getElementById('rpmRightTxt').textContent = `R: ${roverState.rpmR} RPM`;
+      document.getElementById('roverVecTxt').textContent = dir === 'STOP' ? 'Idle' : dir;
       setDriveCmd(lin, ang);
     }
 
@@ -227,14 +223,15 @@
       stopDriveLocal();
       isAutoSpraying = false;
       if (isConnected) socket.emit('estop', {});
-      logSerial('EMERGENCY STOP Triggered');
+      logSerial('EMERGENCY STOP — All motors & nozzle halted');
     }
 
-    // D-pad (pointer events: mouse + touch)
+    // D-pad (pointer events: mouse + touch, pointer captured so sliding off the button still releases)
     document.querySelectorAll('.dpad-btn').forEach(btn => {
       const dir = btn.dataset.dir;
       btn.addEventListener('pointerdown', (e) => {
-        btn.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        if (btn.setPointerCapture) btn.setPointerCapture(e.pointerId);
         btn.classList.add('active');
         if (dir === 'STOP') emergencyStop(); else setRoverDrive(dir);
       });
@@ -246,7 +243,7 @@
       btn.addEventListener('pointercancel', up);
     });
 
-    // Emergency Stop in bottom status bar (works even when offline)
+    // Emergency stop works even when offline
     document.getElementById('emergencyStopBtn').addEventListener('click', emergencyStop);
 
     // Keyboard WASD / arrows, Space = stop
@@ -266,7 +263,7 @@
       if (heldKeys.size) setRoverDrive(KEYDIR[[...heldKeys].pop()]);
       else setRoverDrive('STOP');
     });
-    // Never keep driving if the tab loses focus
+    // Never keep driving if the tab/app loses focus or is hidden (phone lock, app switch)
     window.addEventListener('blur', () => { heldKeys.clear(); if (driveTimer) emergencyStop(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && driveTimer) emergencyStop(); });
 
@@ -281,7 +278,7 @@
       const rect = joyBase.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      const maxR = 40;
+      const maxR = rect.width * 0.32;          // travel radius scales with the pad size
       let dx = clientX - cx;
       let dy = clientY - cy;
       const dist = Math.hypot(dx, dy);
@@ -295,20 +292,20 @@
       const ny = +(-dy / maxR).toFixed(2);
       const deg = Math.round((Math.atan2(ny, nx) * 180) / Math.PI);
 
-      document.getElementById('joyX').textContent = `X: ${nx.toFixed(2)}`;
-      document.getElementById('joyY').textContent = `Y: ${ny.toFixed(2)}`;
-      document.getElementById('joyDeg').textContent = `HDG: ${deg}°`;
+      document.getElementById('joyX').textContent = `X-Axis: ${nx.toFixed(2)}`;
+      document.getElementById('joyY').textContent = `Y-Axis: ${ny.toFixed(2)}`;
+      document.getElementById('joyDeg').textContent = `Heading: ${deg}°`;
 
       roverState.vx = nx;
       roverState.vy = ny;
       roverState.rpmL = Math.round((ny + nx * 0.7) * 130);
       roverState.rpmR = Math.round((ny - nx * 0.7) * 130);
-      roverState.dir = Math.hypot(nx, ny) > 0.12 ? 'JOYSTICK' : 'STOP';
+      roverState.dir = Math.hypot(nx, ny) > 0.1 ? 'JOYSTICK' : 'STOP';
 
-      document.getElementById('roverStateTxt').textContent = roverState.dir === 'STOP' ? 'Standby' : 'Vector Drive';
+      document.getElementById('roverStateTxt').textContent = roverState.dir;
       document.getElementById('rpmLeftTxt').textContent = `L: ${roverState.rpmL} RPM`;
       document.getElementById('rpmRightTxt').textContent = `R: ${roverState.rpmR} RPM`;
-      document.getElementById('roverVecTxt').textContent = `JOY: ${nx},${ny}`;
+      document.getElementById('roverVecTxt').textContent = `VEC: ${nx}, ${ny}`;
       setDriveCmd(ny, -nx);   // linear = forward, angular = left
     }
 
@@ -316,18 +313,23 @@
       if (!joyDragging) return;
       joyDragging = false;
       joyStick.style.transform = `translate(0px, 0px)`;
-      document.getElementById('joyX').textContent = `X: 0.00`;
-      document.getElementById('joyY').textContent = `Y: 0.00`;
-      document.getElementById('joyDeg').textContent = `HDG: 0°`;
+      document.getElementById('joyX').textContent = `X-Axis: 0.00`;
+      document.getElementById('joyY').textContent = `Y-Axis: 0.00`;
+      document.getElementById('joyDeg').textContent = `Heading: 0°`;
       if (isConnected || isSimMode) setRoverDrive('STOP');
     }
 
-    joyBase.addEventListener('pointerdown', (e) => { joyDragging = true; joyBase.setPointerCapture(e.pointerId); handleJoyMove(e.clientX, e.clientY); });
+    joyBase.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (joyBase.setPointerCapture) joyBase.setPointerCapture(e.pointerId);
+      joyDragging = true;
+      handleJoyMove(e.clientX, e.clientY);
+    });
     window.addEventListener('pointermove', (e) => handleJoyMove(e.clientX, e.clientY));
     window.addEventListener('pointerup', resetJoystick);
     window.addEventListener('pointercancel', resetJoystick);
 
-    // ==================== PANEL 2: 3-DOF ARM CONTROLS ====================
+    // ==================== PANEL 2: 3-DOF ARM KINEMATICS ====================
     const sBase = document.getElementById('sliderBase');
     const sShoulder = document.getElementById('sliderShoulder');
     const sElbow = document.getElementById('sliderElbow');
@@ -341,11 +343,11 @@
       }, 50);
     }
 
-    function updateArmTarget(base, shoulder, elbow, poseLabel = 'CUSTOM') {
+    function updateArmTarget(base, shoulder, elbow, label = 'Custom') {
       if (!requireActiveHardware()) {
-        sBase.value = Math.round(armTgt.base);
-        sShoulder.value = Math.round(armTgt.shoulder);
-        sElbow.value = Math.round(armTgt.elbow);
+        sBase.value = armTgt.base;
+        sShoulder.value = armTgt.shoulder;
+        sElbow.value = armTgt.elbow;
         return;
       }
       armTgt = { base: +base, shoulder: +shoulder, elbow: +elbow };
@@ -355,17 +357,14 @@
       document.getElementById('valBase').textContent = `${armTgt.base}°`;
       document.getElementById('valShoulder').textContent = `${armTgt.shoulder}°`;
       document.getElementById('valElbow').textContent = `${armTgt.elbow}°`;
-      document.getElementById('armPoseChip').textContent = `POSE: ${poseLabel}`;
-      document.getElementById('armPoseTxt').textContent = `Pose: ${poseLabel}`;
+      document.getElementById('armPoseTxt').textContent = `Pose: ${label}`;
+      document.getElementById('armPoseChip').textContent = `POSE: ${label.toUpperCase()}`;
       document.getElementById('yawChip').textContent = `BASE YAW: ${armTgt.base}°`;
       sendArmThrottled();
     }
 
     [sBase, sShoulder, sElbow].forEach(el => {
-      el.addEventListener('input', () => {
-        document.querySelectorAll('.pose-row .btn-secondary').forEach(b => b.classList.remove('active'));
-        updateArmTarget(sBase.value, sShoulder.value, sElbow.value, 'MANUAL');
-      });
+      el.addEventListener('input', () => updateArmTarget(sBase.value, sShoulder.value, sElbow.value, 'Manual'));
     });
 
     const POSES = {
@@ -375,19 +374,17 @@
       STOW:  { base: 90, shoulder: 148, elbow: 35 }
     };
 
-    document.querySelectorAll('.pose-row .btn-secondary').forEach(btn => {
+    document.querySelectorAll('[data-pose]').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.pose-row .btn-secondary').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
         const p = POSES[btn.dataset.pose];
         updateArmTarget(p.base, p.shoulder, p.elbow, btn.dataset.pose);
       });
     });
 
-    // ==================== PANEL 3: LEAF CNN & AUTO-SPRINKLER ====================
-    document.querySelectorAll('.cam-actions-left .btn-secondary').forEach(btn => {
+    // ==================== PANEL 3: PLANT LEAF CNN & AUTO-SPRAY ====================
+    document.querySelectorAll('[data-sample]').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.cam-actions-left .btn-secondary').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('[data-sample]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentLeafSample = btn.dataset.sample;
         uploadedLeafImg = null;
@@ -403,24 +400,21 @@
       img.src = URL.createObjectURL(file);
     });
 
-    function setPipelineStep(stepNum) {
-      [1,2,3,4].forEach(n => {
-        document.getElementById(`step${n}`).classList.toggle('active', n <= stepNum);
+    function setPipelineStep(step) {
+      [1, 2, 3, 4].forEach(n => {
+        document.getElementById(`step${n}`).classList.toggle('active', n <= step);
       });
     }
 
     // Applies a CNN result (from the board, or from the local sim samples)
     function applyCNNResult(res) {
-      // Accept board-style keys too
       if (res.sprayMs == null) res.sprayMs = res.spray_ms || 0;
       if (res.sample && LEAF_SAMPLES[res.sample]) currentLeafSample = res.sample;
-      const known = LEAF_SAMPLES[currentLeafSample];
-      if (!res.bbox) res.bbox = known.bbox;
+      if (!res.bbox) res.bbox = LEAF_SAMPLES[currentLeafSample].bbox;
       setPipelineStep(3);
       detectedBBox = res.bbox;
       scanLaserY = -1;
-      cpuLoad = 6;
-      if (!isConnected) document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
+      if (!isConnected) document.getElementById('cpuTxt').textContent = '7%';
 
       document.getElementById('confPctTxt').textContent = `${Math.round(res.conf)}%`;
       const offset = 201 - (201 * res.conf) / 100;
@@ -442,31 +436,24 @@
         setPipelineStep(4);
         const banner = document.getElementById('nozzleBanner');
         const stateTxt = document.getElementById('nozzleStateTxt');
-        const actionBar = document.getElementById('cnnActionTxt');
 
         if (res.sprayMs > 0) {
-          updateArmTarget(90, 68, 95, 'AUTO-SPRAY');
+          updateArmTarget(90, 68, 95, 'Auto-Spray');
           isAutoSpraying = true;
           banner.className = 'nozzle-auto-banner spraying';
-          stateTxt.textContent = `AUTO-SPRAYING (${(res.sprayMs/1000).toFixed(1)}s)`;
-          actionBar.textContent = `CNN Detected ${res.title} (${res.conf}%) -> Auto-Triggered Nozzle for ${res.sprayMs}ms.`;
-          logSerial(`CNN -> MEGA: <SPRY:AUTO,${res.sprayMs}>`);
+          stateTxt.textContent = `AUTO-SPRAYING (${(res.sprayMs / 1000).toFixed(1)}s)`;
+          logSerial(`CNN: ${res.title} (${res.conf}%) -> Auto-Spraying for ${res.sprayMs}ms`);
 
           setTimeout(() => {
             isAutoSpraying = false;
             banner.className = 'nozzle-auto-banner';
-            stateTxt.textContent = 'CYCLE COMPLETE • STANDBY';
-            cpuLoad = 3;
-            if (!isConnected) document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
+            stateTxt.textContent = 'SPRAY COMPLETE • STANDBY';
           }, res.sprayMs);
         } else {
           isAutoSpraying = false;
           banner.className = 'nozzle-auto-banner bypassed';
-          stateTxt.textContent = 'BYPASSED • HEALTHY LEAF (0s)';
-          actionBar.textContent = `CNN Verified Healthy Leaf (${res.conf}%) -> Sprinkler Automatically Bypassed.`;
-          logSerial(`CNN -> MEGA: <SPRY:SKIP,0>`);
-          cpuLoad = 3;
-          if (!isConnected) document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
+          stateTxt.textContent = 'BYPASSED • HEALTHY LEAF';
+          logSerial(`CNN: Healthy Leaf (${res.conf}%) -> Sprinkler bypassed`);
         }
       }, 350);
     }
@@ -475,12 +462,11 @@
       if (!requireActiveHardware()) return;
       detectedBBox = null;
       scanLaserY = 0;
-      cpuLoad = 38;
-      if (!isConnected) document.getElementById('cpuTxt').textContent = `${cpuLoad}%`;
       setPipelineStep(1);
-      updateArmTarget(90, 85, 110, 'SCANNING');
+      if (!isConnected) document.getElementById('cpuTxt').textContent = '44%';
+      updateArmTarget(90, 85, 110, 'Scanning');
 
-      setTimeout(() => setPipelineStep(2), 450);
+      setTimeout(() => setPipelineStep(2), 400);
       if (isConnected && !isSimMode) {
         // Real inference on the board. Send a frame if the user uploaded one.
         let image = null;
@@ -491,11 +477,11 @@
         }
         socket.emit('cnn_predict', { source: uploadedLeafImg ? 'upload' : 'arm_camera', sample: currentLeafSample, image });
       } else {
-        setTimeout(() => applyCNNResult(LEAF_SAMPLES[currentLeafSample]), 1200);
+        setTimeout(() => applyCNNResult(LEAF_SAMPLES[currentLeafSample]), 1150);
       }
     });
 
-    // ==================== THEME-AWARE 60FPS CANVAS RENDERERS ====================
+    // ==================== 60FPS CANVAS RENDERING & LIVE GPS UPDATE ====================
     const roverCanvas = document.getElementById('roverCanvas');
     const rCtx = roverCanvas.getContext('2d');
     const armCanvas = document.getElementById('armCanvas');
@@ -503,18 +489,20 @@
     const leafCanvas = document.getElementById('leafCanvas');
     const lCtx = leafCanvas.getContext('2d');
 
-    function isLightMode() {
-      return document.documentElement.getAttribute('data-theme') === 'light';
+    function updateLiveGPS() {
+      if ((isSimMode && !isConnected) && (Math.abs(roverState.rpmL) > 0 || Math.abs(roverState.rpmR) > 0)) {
+        roverState.lat += roverState.vy * 0.000004;
+        roverState.lon += roverState.vx * 0.000004;
+        document.getElementById('gpsLatTxt').textContent = `LAT: ${roverState.lat.toFixed(4)}° N`;
+        document.getElementById('gpsLonTxt').textContent = `LON: ${roverState.lon.toFixed(4)}° E`;
+      }
     }
 
     function drawRoverCanvas() {
       const W = roverCanvas.width, H = roverCanvas.height;
       rCtx.clearRect(0, 0, W, H);
-      const light = isLightMode();
 
-      // Crop row guide lines
-      rCtx.strokeStyle = light ? 'rgba(5, 150, 105, 0.35)' : 'rgba(16, 185, 129, 0.22)';
-      rCtx.lineWidth = 2;
+      rCtx.strokeStyle = 'rgba(16, 185, 129, 0.25)';
       rCtx.setLineDash([8, 8]);
       rCtx.beginPath();
       rCtx.moveTo(95, 0); rCtx.lineTo(95, H);
@@ -522,37 +510,24 @@
       rCtx.stroke();
       rCtx.setLineDash([]);
 
-      // Update tread & live GPS coordinates when moving
-      if ((isConnected || isSimMode) && (roverState.rpmL !== 0 || roverState.rpmR !== 0)) {
-        const avgRpm = (roverState.rpmL + roverState.rpmR) / 2;
-        roverState.treadOffset = (roverState.treadOffset + avgRpm * 0.015) % 14;
-        roverState.heading = (roverState.heading + (roverState.rpmL - roverState.rpmR) * 0.01 + 360) % 360;
-        const rad = (roverState.heading * Math.PI) / 180;
-        roverState.lat += Math.cos(rad) * (avgRpm * 0.00000008);
-        roverState.lon += Math.sin(rad) * (avgRpm * 0.00000008);
-        updateGpsDisplay();
-      }
-
-      const cx = W / 2, cy = H / 2;
+      const cx = W / 2, cy = H / 2 + 6;
       rCtx.save();
       rCtx.translate(cx, cy);
 
-      // Left & Right Rubber Tracks
       [-56, 38].forEach((tx, idx) => {
-        rCtx.fillStyle = light ? '#334155' : '#1E293B';
-        rCtx.strokeStyle = light ? '#0F172A' : '#475569';
+        rCtx.fillStyle = '#1E293B';
+        rCtx.strokeStyle = '#475569';
         rCtx.lineWidth = 1.5;
         rCtx.beginPath();
-        rCtx.roundRect(tx, -44, 18, 88, 5);
+        rCtx.roundRect(tx, -46, 18, 92, 5);
         rCtx.fill();
         rCtx.stroke();
 
-        // Moving tread grooves
-        rCtx.strokeStyle = '#00C2CB';
+        rCtx.strokeStyle = '#00B5BC';
         rCtx.lineWidth = 2;
-        const dirShift = idx === 0 ? roverState.rpmL : roverState.rpmR;
-        const off = ((Date.now() * dirShift * 0.004) % 12 + 12) % 12;
-        for (let y = -38 + off; y < 40; y += 12) {
+        const rpm = (isConnected || isSimMode) ? (idx === 0 ? roverState.rpmL : roverState.rpmR) : 0;
+        const off = ((Date.now() * rpm * 0.004) % 12 + 12) % 12;
+        for (let y = -40 + off; y < 42; y += 12) {
           rCtx.beginPath();
           rCtx.moveTo(tx + 3, y);
           rCtx.lineTo(tx + 15, y);
@@ -560,49 +535,44 @@
         }
       });
 
-      // Main Rover Armored Chassis
       rCtx.fillStyle = '#0F172A';
       rCtx.strokeStyle = '#00979D';
       rCtx.lineWidth = 2;
       rCtx.beginPath();
-      rCtx.roundRect(-38, -38, 76, 76, 8);
+      rCtx.roundRect(-38, -40, 76, 80, 8);
       rCtx.fill();
       rCtx.stroke();
 
-      // Inner UNO Q Deck Accent
-      rCtx.fillStyle = 'rgba(0, 151, 157, 0.25)';
-      rCtx.fillRect(-26, -22, 52, 44);
+      rCtx.fillStyle = 'rgba(0, 151, 157, 0.22)';
+      rCtx.fillRect(-26, -24, 52, 48);
 
-      // Center Turntable Ring
       rCtx.strokeStyle = '#38BDF8';
-      rCtx.lineWidth = 1.8;
       rCtx.beginPath();
       rCtx.arc(0, 0, 13, 0, Math.PI * 2);
       rCtx.stroke();
 
-      // Front Sonar Cone when active
       if ((isConnected || isSimMode) && (Math.abs(roverState.rpmL) > 0 || Math.abs(roverState.rpmR) > 0)) {
-        rCtx.strokeStyle = light ? '#0284C7' : 'rgba(56, 189, 248, 0.65)';
-        for (let r = 12; r <= 30; r += 9) {
+        rCtx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+        for (let r = 14; r <= 34; r += 10) {
           rCtx.beginPath();
-          rCtx.arc(0, -42, r, -Math.PI * 0.75, -Math.PI * 0.25);
+          rCtx.arc(0, -44, r, -Math.PI * 0.75, -Math.PI * 0.25);
           rCtx.stroke();
         }
       }
-
       rCtx.restore();
     }
 
     function drawArmCanvas() {
       const W = armCanvas.width, H = armCanvas.height;
       aCtx.clearRect(0, 0, W, H);
-      const light = isLightMode();
 
       if (isConnected || isSimMode) {
         armCur.base += (armTgt.base - armCur.base) * 0.12;
         armCur.shoulder += (armTgt.shoulder - armCur.shoulder) * 0.12;
         armCur.elbow += (armTgt.elbow - armCur.elbow) * 0.12;
       }
+
+      const light = document.documentElement.getAttribute('data-theme') === 'light';
 
       // Ground line
       aCtx.strokeStyle = light ? '#CBD5E1' : '#222D36';
@@ -612,15 +582,15 @@
       aCtx.lineTo(W - 20, H - 16);
       aCtx.stroke();
 
-      // Target Plant on Right Side
+      // Target Plant on Right Side in front of the arm
       const plantX = 335, plantY = H - 16;
       aCtx.strokeStyle = '#15803D';
       aCtx.lineWidth = 3;
       aCtx.beginPath();
       aCtx.moveTo(plantX, plantY);
-      aCtx.lineTo(plantX, plantY - 90);
+      aCtx.lineTo(plantX, plantY - 95);
       aCtx.stroke();
-      [{dx: -18, dy: -68, r: -0.35}, {dx: 16, dy: -52, r: 0.35}].forEach(lf => {
+      [{dx: -18, dy: -72, r: -0.35}, {dx: 16, dy: -54, r: 0.35}].forEach(lf => {
         aCtx.save();
         aCtx.translate(plantX + lf.dx, plantY + lf.dy);
         aCtx.rotate(lf.r);
@@ -631,33 +601,28 @@
         aCtx.restore();
       });
 
-      // Rover Deck Base at Bottom Center-Left
-      const baseX = 155, baseY = H - 20;
-      aCtx.fillStyle = light ? '#334155' : '#1E293B';
+      const baseX = 165, baseY = H - 22;
+      aCtx.fillStyle = '#1E293B';
       aCtx.strokeStyle = '#00979D';
       aCtx.lineWidth = 2;
       aCtx.beginPath();
-      aCtx.roundRect(baseX - 46, baseY, 92, 15, 4);
+      aCtx.roundRect(baseX - 48, baseY, 96, 16, 4);
       aCtx.fill();
       aCtx.stroke();
 
-      // Rotating Turntable Pedestal (DOF 1 Base Yaw)
       aCtx.fillStyle = '#00979D';
       aCtx.fillRect(baseX - 18, baseY - 10, 36, 10);
 
-      // Calculate Link 1 (DOF 2 Shoulder Pitch)
-      const L1 = 60, L2 = 54;
+      const L1 = 64, L2 = 56;
       const shRad = (-armCur.shoulder * Math.PI) / 180;
       const j1x = baseX + Math.cos(shRad) * L1;
       const j1y = (baseY - 10) + Math.sin(shRad) * L1;
 
-      // Calculate Link 2 (DOF 3 Elbow Pitch)
       const elRad = shRad + ((90 - armCur.elbow) * Math.PI) / 180;
       const j2x = j1x + Math.cos(elRad) * L2;
       const j2y = j1y + Math.sin(elRad) * L2;
 
-      // Draw Link 1 (Shoulder)
-      aCtx.strokeStyle = '#00979D';
+      aCtx.strokeStyle = '#00B5BC';
       aCtx.lineWidth = 9;
       aCtx.lineCap = 'round';
       aCtx.beginPath();
@@ -665,18 +630,16 @@
       aCtx.lineTo(j1x, j1y);
       aCtx.stroke();
 
-      // Draw Link 2 (Elbow)
-      aCtx.strokeStyle = light ? '#0284C7' : '#38BDF8';
+      aCtx.strokeStyle = '#38BDF8';
       aCtx.lineWidth = 7;
       aCtx.beginPath();
       aCtx.moveTo(j1x, j1y);
       aCtx.lineTo(j2x, j2y);
       aCtx.stroke();
 
-      // Draw Servo Pivot Joints
       [[baseX, baseY - 10], [j1x, j1y]].forEach(([jx, jy]) => {
-        aCtx.fillStyle = light ? '#FFFFFF' : '#0F172A';
-        aCtx.strokeStyle = light ? '#0F172A' : '#F8FAFC';
+        aCtx.fillStyle = '#0F172A';
+        aCtx.strokeStyle = '#F8FAFC';
         aCtx.lineWidth = 2;
         aCtx.beginPath();
         aCtx.arc(jx, jy, 6, 0, Math.PI * 2);
@@ -684,42 +647,37 @@
         aCtx.stroke();
       });
 
-      // End-Effector: Vision Camera + Sprinkling Nozzle Head
       aCtx.save();
       aCtx.translate(j2x, j2y);
       aCtx.rotate(elRad);
 
-      // Camera FOV Cone
-      aCtx.fillStyle = light ? 'rgba(2, 132, 199, 0.18)' : 'rgba(56, 189, 248, 0.18)';
+      aCtx.fillStyle = 'rgba(56, 189, 248, 0.18)';
       aCtx.beginPath();
       aCtx.moveTo(12, -3);
-      aCtx.lineTo(75, -24);
-      aCtx.lineTo(75, 18);
+      aCtx.lineTo(72, -26);
+      aCtx.lineTo(72, 20);
       aCtx.closePath();
       aCtx.fill();
 
-      // Camera & Nozzle Housing
       aCtx.fillStyle = '#0F172A';
-      aCtx.strokeStyle = '#00C2CB';
+      aCtx.strokeStyle = '#00B5BC';
       aCtx.lineWidth = 2;
       aCtx.beginPath();
       aCtx.roundRect(-6, -9, 22, 18, 4);
       aCtx.fill();
       aCtx.stroke();
 
-      // Nozzle Tip (Amber)
       aCtx.fillStyle = '#F59E0B';
       aCtx.fillRect(16, 2, 6, 5);
       aCtx.restore();
 
-      // Autonomous Spray Particles
       if (isAutoSpraying && (isConnected || isSimMode)) {
         for (let i = 0; i < 3; i++) {
           sprayParticles.push({
             x: j2x + Math.cos(elRad) * 20,
             y: j2y + Math.sin(elRad) * 20,
-            vx: Math.cos(elRad + (Math.random() - 0.5) * 0.45) * (3.8 + Math.random() * 2),
-            vy: Math.sin(elRad + (Math.random() - 0.5) * 0.45) * (3.8 + Math.random() * 2),
+            vx: Math.cos(elRad + (Math.random() - 0.5) * 0.45) * (3.5 + Math.random() * 2),
+            vy: Math.sin(elRad + (Math.random() - 0.5) * 0.45) * (3.5 + Math.random() * 2),
             alpha: 1
           });
         }
@@ -751,45 +709,39 @@
       } else {
         const sample = LEAF_SAMPLES[currentLeafSample];
         lCtx.save();
-        const grad = lCtx.createLinearGradient(110, 25, 310, 145);
-        grad.addColorStop(0, '#16A34A');
-        grad.addColorStop(0.6, '#15803D');
+        const grad = lCtx.createLinearGradient(110, 25, 310, 135);
+        grad.addColorStop(0, '#15803D');
+        grad.addColorStop(0.6, '#166534');
         grad.addColorStop(1, '#14532D');
         lCtx.fillStyle = grad;
-        lCtx.strokeStyle = '#15803D';
-        lCtx.lineWidth = 1.5;
         lCtx.beginPath();
-        lCtx.moveTo(110, 88);
-        lCtx.quadraticCurveTo(190, 14, 310, 84);
-        lCtx.quadraticCurveTo(190, 154, 110, 88);
+        lCtx.moveTo(110, 86);
+        lCtx.quadraticCurveTo(190, 14, 310, 82);
+        lCtx.quadraticCurveTo(190, 152, 110, 86);
         lCtx.fill();
-        lCtx.stroke();
 
-        // Midrib & Veins
-        lCtx.strokeStyle = 'rgba(187, 247, 208, 0.55)';
+        lCtx.strokeStyle = 'rgba(187, 247, 208, 0.5)';
         lCtx.lineWidth = 2;
         lCtx.beginPath();
-        lCtx.moveTo(95, 88);
-        lCtx.lineTo(298, 85);
+        lCtx.moveTo(95, 86);
+        lCtx.lineTo(295, 83);
         lCtx.stroke();
 
-        // Disease Lesions
         sample.lesions.forEach(ls => {
           lCtx.fillStyle = ls.c;
           lCtx.beginPath();
           lCtx.arc(ls.x, ls.y, ls.r, 0, Math.PI * 2);
           lCtx.fill();
           lCtx.strokeStyle = '#F59E0B';
-          lCtx.lineWidth = 1.2;
+          lCtx.lineWidth = 1;
           lCtx.stroke();
         });
         lCtx.restore();
       }
 
-      // Laser Scan Line during CNN Inference
       if (scanLaserY >= 0) {
         scanLaserY = (scanLaserY + 3.4) % H;
-        lCtx.strokeStyle = '#00C2CB';
+        lCtx.strokeStyle = '#00B5BC';
         lCtx.lineWidth = 2.5;
         lCtx.beginPath();
         lCtx.moveTo(0, scanLaserY);
@@ -797,28 +749,24 @@
         lCtx.stroke();
       }
 
-      // Detected Bounding Box Overlay
       if (detectedBBox) {
         lCtx.strokeStyle = detectedBBox.color;
         lCtx.lineWidth = 2;
         lCtx.strokeRect(detectedBBox.x, detectedBBox.y, detectedBBox.w, detectedBBox.h);
         lCtx.fillStyle = detectedBBox.color;
-        lCtx.fillRect(detectedBBox.x, detectedBBox.y - 16, 130, 16);
-        lCtx.fillStyle = '#FFFFFF';
-        lCtx.font = 'bold 10px IBM Plex Mono';
-        lCtx.fillText(LEAF_SAMPLES[currentLeafSample].title.toUpperCase(), detectedBBox.x + 5, detectedBBox.y - 4);
+        lCtx.font = 'bold 10.5px IBM Plex Mono';
+        lCtx.fillText(LEAF_SAMPLES[currentLeafSample].title.toUpperCase(), detectedBBox.x + 4, detectedBBox.y - 5);
       }
     }
 
     function animateLoop() {
+      updateLiveGPS();
       drawRoverCanvas();
       drawArmCanvas();
       drawLeafCanvas();
       requestAnimationFrame(animateLoop);
     }
     animateLoop();
-
-
 // ==================== SYSTEM RESOURCES LOGGER ====================
 (function () {
   const LIVE_MAX = 60;                 // 60 samples x 5 s = 5 min
